@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Earmark</title>
+<meta name="description" content="Turn your Shazam screenshots into a Spotify playlist.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 3h18v26l-9-6-9 6z' fill='%230E8A7E'/%3E%3Cpath d='M17 3h8v8z' fill='%23F2C94C'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column of three numbered steps (connect, pick a playlist, drop screenshots), then the review list and a sticky "add" bar. Each step is a folded index card with a dog-eared corner. */
+:root {
+  --paper: #EEF1F0;
+  --card: #FFFFFF;
+  --ink: #15201E;
+  --ink-soft: #5A6866;
+  --line: #D3DAD8;
+  --teal: #0E8A7E;
+  --teal-ink: #FFFFFF;
+  --marker: #F2C94C;
+  --warn: #B4532A;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101716; --card: #18211F; --ink: #E7EEEC; --ink-soft: #97A6A3; --line: #2C3836;
+    --teal: #2BB3A4; --teal-ink: #08201D; --marker: #E9C04A; --warn: #E08A5F; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101716; --card: #18211F; --ink: #E7EEEC; --ink-soft: #97A6A3; --line: #2C3836;
+  --teal: #2BB3A4; --teal-ink: #08201D; --marker: #E9C04A; --warn: #E08A5F; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 120px;
+}
+.wrap { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+header { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+h1 { font: 800 clamp(34px, 8vw, 48px)/1 var(--display); letter-spacing: -0.02em; margin: 0; }
+h1 mark { background: linear-gradient(transparent 58%, var(--marker) 58% 90%, transparent 90%); color: inherit; padding: 0 2px; }
+.lede { margin: 0; color: var(--ink-soft); max-width: 46ch; }
+
+.step { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.step::after { content: ""; position: absolute; top: -1px; right: -1px; width: 22px; height: 22px; background: linear-gradient(225deg, var(--paper) 50%, var(--line) 50%); border-bottom-left-radius: 3px; }
+.step.done { opacity: 0.92; }
+.step h2 { margin: 0; font: 600 20px/1.2 var(--display); display: flex; align-items: center; gap: 10px; }
+.num { font: 600 13px/1 var(--mono); width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; border: 1.5px solid var(--ink); flex: none; }
+.step.done .num { background: var(--teal); border-color: var(--teal); color: var(--teal-ink); }
+.step p { margin: 0; color: var(--ink-soft); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+button, .btn { font: 700 15px/1 var(--body); border: 0; border-radius: 999px; padding: 12px 18px; cursor: pointer; background: var(--ink); color: var(--paper); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+button.primary { background: var(--teal); color: var(--teal-ink); }
+button.ghost, .btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--marker); outline-offset: 2px; }
+select, input[type="text"] { font: 500 15px/1.2 var(--body); color: var(--ink); background: var(--paper); border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+select { flex: 1 1 220px; }
+input[type="text"] { flex: 1 1 200px; }
+
+.who { display: flex; align-items: center; gap: 10px; }
+.who img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: var(--line); }
+
+.drop { border: 2px dashed var(--line); border-radius: 6px; padding: 26px 16px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; cursor: pointer; transition: border-color 120ms, background 120ms; }
+.drop.over { border-color: var(--teal); background: color-mix(in srgb, var(--teal) 8%, transparent); }
+.drop strong { font: 600 18px/1.2 var(--display); }
+.drop small { color: var(--ink-soft); }
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.shot { position: relative; aspect-ratio: 9 / 16; max-width: 100%; border-radius: 6px; overflow: hidden; background: var(--line); border: 1px solid var(--line); }
+.shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot span { position: absolute; inset: auto 0 0 0; font: 600 11px/1.3 var(--mono); padding: 4px 6px; background: color-mix(in srgb, var(--card) 88%, transparent); color: var(--ink); }
+.shot.error span { color: var(--warn); }
+.shot.busy img { opacity: 0.55; }
+
+.list { display: flex; flex-direction: column; gap: 8px; }
+.list-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.list-head h2 { margin: 0; font: 600 20px/1.2 var(--display); }
+.list-head small { color: var(--ink-soft); font: 400 13px/1 var(--mono); }
+.song { display: grid; grid-template-columns: auto 52px minmax(0, 1fr); gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.song.off { opacity: 0.55; }
+.song input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--teal); }
+.song .art { width: 52px; height: 52px; border-radius: 3px; object-fit: cover; background: var(--line); }
+.song .info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.song .name { font-weight: 700; overflow-wrap: anywhere; }
+.song .by { color: var(--ink-soft); font-size: 14px; overflow-wrap: anywhere; }
+.song .read { font: 400 12px/1.4 var(--mono); color: var(--ink-soft); overflow-wrap: anywhere; }
+.song .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { font: 600 11px/1 var(--mono); padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+.tag.dup { border-color: var(--marker); color: var(--ink); background: color-mix(in srgb, var(--marker) 25%, transparent); }
+.tag.miss { border-color: var(--warn); color: var(--warn); }
+.song .fix { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.song .fix select, .song .fix input { font-size: 13px; padding: 6px 8px; flex: 1 1 160px; }
+.song .fix button { font-size: 13px; padding: 7px 12px; }
+.empty { color: var(--ink-soft); text-align: center; padding: 18px; border: 1px dashed var(--line); border-radius: 6px; margin: 0; }
+
+.bar { position: fixed; inset: auto 0 0 0; background: var(--card); border-top: 1px solid var(--line); padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); z-index: 5; }
+.bar .inner { max-width: 640px; margin: 0 auto; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.bar p { margin: 0; color: var(--ink-soft); font-size: 14px; flex: 1 1 200px; min-width: 0; }
+.msg { margin: 0; font-weight: 600; color: var(--warn); min-height: 0; }
+.msg.ok { color: var(--teal); }
+.setup { background: color-mix(in srgb, var(--marker) 22%, var(--card)); border: 1px solid var(--marker); border-radius: 6px; padding: 14px 16px; }
+.setup code { font: 13px var(--mono); }
+footer { color: var(--ink-soft); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .drop { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><mark>Earmark</mark></h1>
+    <p class="lede">Drop in your Shazam screenshots. Earmark reads the songs and adds them to a Spotify playlist you pick.</p>
+  </header>
+
+  <div class="setup" id="setup" hidden>
+    <strong>Almost ready.</strong> Fill in <code>SPOTIFY_CLIENT_ID</code> and <code>EXTRACT_URL</code> near the top of the script in <code>index.html</code>. The README walks through it.
+  </div>
+
+  <section class="step" id="step-connect" aria-labelledby="h-connect">
+    <h2 id="h-connect"><span class="num">1</span>Connect Spotify</h2>
+    <div id="signed-out" class="row">
+      <p>Earmark only asks to see and edit your playlists.</p>
+      <button class="primary" id="login" type="button">Connect Spotify</button>
+    </div>
+    <div id="signed-in" class="row" hidden>
+      <div class="who"><img id="avatar" alt=""><span>Signed in as <strong id="me-name"></strong> <small class="read">(Spotify ID: <span id="me-id"></span>)</small></span></div>
+      <button class="ghost" id="logout" type="button">Sign out</button>
+    </div>
+    <p class="msg" id="connect-msg" role="status"></p>
+  </section>
+
+  <section class="step" id="step-playlist" aria-labelledby="h-playlist">
+    <h2 id="h-playlist"><span class="num">2</span>Pick a playlist</h2>
+    <div class="row">
+      <select id="playlist" aria-label="Playlist" disabled><option>Connect Spotify first</option></select>
+    </div>
+    <div class="row" id="new-row" hidden>
+      <input type="text" id="new-name" placeholder="New playlist name" maxlength="100" aria-label="New playlist name">
+      <button type="button" id="create">Create playlist</button>
+    </div>
+    <p class="msg" id="playlist-msg" role="status"></p>
+  </section>
+
+  <section class="step" id="step-shots" aria-labelledby="h-shots">
+    <h2 id="h-shots"><span class="num">3</span>Add screenshots</h2>
+    <label class="drop" id="drop" for="files">
+      <strong>Drop screenshots here</strong>
+      <small>or click to choose, or paste with ⌘V / Ctrl+V. Song pages, your Shazam history list, notifications: all fine.</small>
+      <input type="file" id="files" accept="image/*" multiple hidden>
+    </label>
+    <div class="shots" id="shots"></div>
+  </section>
+
+  <section class="list" aria-labelledby="h-list">
+    <div class="list-head"><h2 id="h-list">Songs found</h2><small id="list-count"></small></div>
+    <div id="songs"><p class="empty">Songs from your screenshots will show up here, matched to Spotify.</p></div>
+  </section>
+
+  <footer>Screenshots are sent to an AI model to read the song names and aren't stored.</footer>
+</div>
+
+<div class="bar">
+  <div class="inner">
+    <p id="bar-text">Pick a playlist and add screenshots.</p>
+    <button class="primary" id="add" type="button" disabled>Add songs</button>
+  </div>
+</div>
+
+<script>
+// Setup: your Spotify app's client ID, and the URL of the Supabase "extract" function. See README.md.
+const SPOTIFY_CLIENT_ID = "";
+const EXTRACT_URL = "";
+
+const SCOPES = "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public user-read-private";
+const REDIRECT_URI = location.origin + location.pathname;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[c]);
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+// ---------- Spotify sign-in (authorization code with PKCE; no server needed) ----------
+const b64url = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+async function login() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
+  store.set("earmark-pkce", {verifier, state});
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  location.href = "https://accounts.spotify.com/authorize?" + new URLSearchParams({
+    response_type: "code", client_id: SPOTIFY_CLIENT_ID, scope: SCOPES, redirect_uri: REDIRECT_URI,
+    code_challenge_method: "S256", code_challenge: challenge, state,
+  });
+}
+async function tokenRequest(params) {
+  const r = await fetch("https://accounts.spotify.com/api/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: new URLSearchParams({client_id: SPOTIFY_CLIENT_ID, ...params})});
+  if (!r.ok) throw new Error("token " + r.status);
+  const t = await r.json();
+  const old = store.get("earmark-token") || {};
+  const tok = {access: t.access_token, refresh: t.refresh_token || old.refresh, expires: Date.now() + (t.expires_in - 60) * 1000};
+  store.set("earmark-token", tok);
+  return tok;
+}
+async function finishLogin() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("code") && !q.has("error")) return;
+  history.replaceState(null, "", REDIRECT_URI);
+  const pkce = store.get("earmark-pkce"); store.set("earmark-pkce", null);
+  if (q.get("error")) { $("#connect-msg").textContent = q.get("error") === "access_denied" ? "Spotify sign-in was cancelled." : "Spotify sign-in didn't work. Try again."; return; }
+  if (!pkce || pkce.state !== q.get("state")) { $("#connect-msg").textContent = "Spotify sign-in expired. Try again."; return; }
+  await tokenRequest({grant_type: "authorization_code", code: q.get("code"), redirect_uri: REDIRECT_URI, code_verifier: pkce.verifier});
+}
+async function accessToken() {
+  let tok = store.get("earmark-token");
+  if (!tok) return null;
+  if (Date.now() > tok.expires) {
+    try { tok = await tokenRequest({grant_type: "refresh_token", refresh_token: tok.refresh}); }
+    catch { store.set("earmark-token", null); return null; }
+  }
+  return tok.access;
+}
+async function spotify(path, opts = {}, retry = true) {
+  const token = await accessToken();
+  if (!token) { signedOut("Your Spotify sign-in expired. Connect again."); throw new Error("signed out"); }
+  const r = await fetch(path.startsWith("http") ? path : "https://api.spotify.com/v1" + path, {...opts, headers: {Authorization: "Bearer " + token, "Content-Type": "application/json", ...(opts.headers || {})}});
+  if (r.status === 401 && retry) { const t = store.get("earmark-token"); if (t) { t.expires = 0; store.set("earmark-token", t); } return spotify(path, opts, false); }
+  if (r.status === 429 && retry) { await new Promise(res => setTimeout(res, (Number(r.headers.get("Retry-After")) || 2) * 1000)); return spotify(path, opts, false); }
+  if (!r.ok) { const e = new Error("spotify " + r.status); e.status = r.status; throw e; }
+  return r.status === 204 ? null : r.json();
+}
+
+// ---------- State ----------
+let me = null, playlists = [], current = null, inPlaylist = new Set();
+const shots = [];   // {id, url, status, text}
+let songs = [];     // {key, shot, read: {title, artist}, options: [track], pick: index | -1, include}
+
+function signedOut(message) {
+  store.set("earmark-token", null);
+  me = null; playlists = []; current = null;
+  $("#signed-in").hidden = true; $("#signed-out").hidden = false;
+  $("#step-connect").classList.remove("done");
+  $("#playlist").innerHTML = "<option>Connect Spotify first</option>"; $("#playlist").disabled = true; $("#new-row").hidden = true;
+  if (message) $("#connect-msg").textContent = message;
+  update();
+}
+
+async function signedIn() {
+  try { me = await spotify("/me"); }
+  catch (e) {
+    if (e.status === 403) signedOut("This Spotify account isn't on the app's guest list yet. Ask the owner to add the email you use for Spotify.");
+    return;
+  }
+  $("#signed-out").hidden = true; $("#signed-in").hidden = false; $("#connect-msg").textContent = "";
+  $("#me-name").textContent = me.display_name || me.id;
+  $("#me-id").textContent = me.id;
+  $("#avatar").src = me.images?.[0]?.url || ""; $("#avatar").hidden = !me.images?.length;
+  $("#step-connect").classList.add("done");
+  await loadPlaylists();
+}
+
+async function loadPlaylists(selectId) {
+  playlists = [];
+  let next = "/me/playlists?limit=50";
+  while (next && playlists.length < 500) { const page = await spotify(next); playlists.push(...page.items.filter(p => p && (p.owner?.id === me.id || p.collaborative))); next = page.next; }
+  const last = selectId || store.get("earmark-playlist");
+  $("#playlist").innerHTML = `<option value="">Choose a playlist…</option>` + playlists.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") + `<option value="__new">+ New playlist…</option>`;
+  $("#playlist").disabled = false;
+  if (last && playlists.some(p => p.id === last)) { $("#playlist").value = last; await choosePlaylist(last); } else update();
+}
+
+async function choosePlaylist(id) {
+  $("#playlist-msg").textContent = ""; $("#playlist-msg").className = "msg";
+  $("#new-row").hidden = id !== "__new";
+  current = playlists.find(p => p.id === id) || null;
+  inPlaylist = new Set();
+  $("#step-playlist").classList.toggle("done", !!current);
+  if (current) {
+    store.set("earmark-playlist", current.id);
+    // Note what's already in the playlist so we don't add duplicates.
+    let next = `/playlists/${current.id}/tracks?fields=items(track(uri)),next&limit=100`;
+    try { while (next && inPlaylist.size < 5000) { const page = await spotify(next); page.items.forEach(i => i.track?.uri && inPlaylist.add(i.track.uri)); next = page.next; } }
+    catch { /* duplicates just won't be flagged */ }
+    for (const s of songs) { const t = s.options[s.pick]; if (t && inPlaylist.has(t.uri)) s.include = false; }
+  } else if (id === "__new") $("#new-name").focus();
+  renderSongs();
+}
+
+async function createPlaylist() {
+  const name = $("#new-name").value.trim();
+  if (!name) { $("#playlist-msg").textContent = "Give the new playlist a name."; return; }
+  $("#create").disabled = true;
+  try {
+    const p = await spotify(`/users/${encodeURIComponent(me.id)}/playlists`, {method: "POST", body: JSON.stringify({name, public: false, description: "Songs saved with Earmark"})});
+    $("#new-name").value = "";
+    await loadPlaylists(p.id);
+  } catch { $("#playlist-msg").textContent = "Spotify didn't create the playlist. Try again."; }
+  finally { $("#create").disabled = false; }
+}
+
+// ---------- Screenshots -> songs ----------
+// Shrink each screenshot before sending: 1568px on the long side is plenty to read text.
+async function prepare(file) {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1568 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+
+// Read up to three screenshots at a time.
+const pending = []; let active = 0;
+function pump() {
+  while (active < 3 && pending.length) {
+    const [shot, file] = pending.shift();
+    active++;
+    readShot(shot, file).finally(() => { active--; pump(); });
+  }
+}
+function addFiles(files) {
+  const imgs = [...files].filter(f => f && f.type.startsWith("image/"));
+  if (!imgs.length) return;
+  if (!me) { $("#connect-msg").textContent = "Connect Spotify first, then add screenshots."; return; }
+  for (const file of imgs) {
+    const shot = {id: shots.length + 1, url: URL.createObjectURL(file), status: "busy", text: "Waiting…"};
+    shots.push(shot);
+    pending.push([shot, file]);
+  }
+  renderShots();
+  pump();
+}
+
+async function readShot(shot, file) {
+  shot.text = "Reading…"; renderShots();
+  try {
+    const data = await prepare(file);
+    const token = await accessToken();
+    const r = await fetch(EXTRACT_URL, {method: "POST", headers: {"Content-Type": "application/json", "x-spotify-token": token || ""}, body: JSON.stringify({images: [{data, mediaType: "image/jpeg"}]})});
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || "Couldn't read this one.");
+    const result = body.results[0];
+    if (result.error) throw new Error(result.error);
+    shot.status = result.songs.length ? "ok" : "error";
+    shot.text = result.songs.length ? `${result.songs.length} song${result.songs.length === 1 ? "" : "s"}` : "No song found";
+    renderShots();
+    for (const read of result.songs) await addSong(shot, read);
+  } catch (e) {
+    shot.status = "error"; shot.text = e.message === "Failed to fetch" ? "Couldn't reach the reader" : e.message;
+    renderShots();
+  }
+}
+
+async function search(q) {
+  const res = await spotify("/search?" + new URLSearchParams({q, type: "track", limit: "5"}));
+  return res.tracks.items;
+}
+async function findTracks(read) {
+  const clean = s => s.replace(/"/g, "").trim();
+  let options = await search(`track:"${clean(read.title)}" artist:"${clean(read.artist)}"`);
+  if (!options.length) options = await search(`${clean(read.title)} ${clean(read.artist)}`);
+  return options;
+}
+async function addSong(shot, read) {
+  const key = (read.title + "|" + read.artist).toLowerCase();
+  if (songs.some(s => s.key === key)) return;
+  const song = {key, shot: shot.id, read, options: [], pick: -1, include: false, searching: true};
+  songs.push(song); renderSongs();
+  try { song.options = await findTracks(read); } catch { /* shows as no match */ }
+  song.searching = false;
+  choose(song, song.options.length ? 0 : -1);
+}
+function choose(song, i) {
+  song.pick = i;
+  const t = song.options[i];
+  if (t && songs.some(s => s !== song && s.include && s.options[s.pick]?.uri === t.uri)) song.include = false;
+  else song.include = !!t && !inPlaylist.has(t.uri);
+  renderSongs();
+}
+
+// ---------- Rendering ----------
+function renderShots() {
+  $("#shots").innerHTML = shots.map(s => `<div class="shot ${s.status}"><img src="${s.url}" alt="Screenshot ${s.id}"><span>${esc(s.text)}</span></div>`).join("");
+  update();
+}
+function renderSongs() {
+  if (!songs.length) { $("#songs").innerHTML = `<p class="empty">Songs from your screenshots will show up here, matched to Spotify.</p>`; update(); return; }
+  $("#songs").innerHTML = `<div class="list">` + songs.map((s, i) => {
+    const t = s.options[s.pick];
+    const dup = t && inPlaylist.has(t.uri);
+    const art = t?.album?.images?.at(-1)?.url || t?.album?.images?.[0]?.url;
+    const tags = [s.searching ? `<span class="tag">Searching Spotify…</span>` : "", dup ? `<span class="tag dup">Already in playlist</span>` : "", !s.searching && !t ? `<span class="tag miss">No match on Spotify</span>` : ""].join("");
+    const alts = s.options.length > 1 ? `<select data-alt="${i}" aria-label="Pick a different version">${s.options.map((o, j) => `<option value="${j}" ${j === s.pick ? "selected" : ""}>${esc(o.name)} · ${esc(o.artists.map(a => a.name).join(", "))}</option>`).join("")}</select>` : "";
+    return `<div class="song ${s.include ? "" : "off"}">
+      <input type="checkbox" data-inc="${i}" ${s.include ? "checked" : ""} ${t ? "" : "disabled"} aria-label="Add ${esc(t?.name || s.read.title)}">
+      ${art ? `<img class="art" src="${esc(art)}" alt="">` : `<div class="art"></div>`}
+      <div class="info">
+        <span class="name">${esc(t ? t.name : s.read.title)}</span>
+        <span class="by">${esc(t ? t.artists.map(a => a.name).join(", ") : s.read.artist)}</span>
+        <span class="read">Read from screenshot ${s.shot}: ${esc(s.read.title)} — ${esc(s.read.artist)}</span>
+        ${tags ? `<div class="tags">${tags}</div>` : ""}
+        ${!s.searching ? `<div class="fix">${alts}<input type="text" data-q="${i}" placeholder="Wrong song? Search Spotify" aria-label="Search for the right song"><button type="button" class="ghost" data-go="${i}">Search</button></div>` : ""}
+      </div></div>`;
+  }).join("") + `</div>`;
+  update();
+}
+function update() {
+  const picked = songs.filter(s => s.include && s.options[s.pick]);
+  const reading = shots.filter(s => s.status === "busy").length;
+  $("#list-count").textContent = songs.length ? `${picked.length} of ${songs.length} selected` : "";
+  $("#add").disabled = !current || !picked.length || !me;
+  $("#add").textContent = picked.length ? `Add ${picked.length} song${picked.length === 1 ? "" : "s"}` : "Add songs";
+  $("#bar-text").textContent = !me ? "Connect Spotify to start." : !current ? "Pick a playlist." : reading ? `Reading ${reading} screenshot${reading === 1 ? "" : "s"}…` : picked.length ? `Ready to add to “${current.name}”.` : "Add screenshots to find songs.";
+}
+
+async function addToPlaylist() {
+  const uris = [...new Set(songs.filter(s => s.include && s.options[s.pick]).map(s => s.options[s.pick].uri))];
+  $("#add").disabled = true; $("#add").textContent = "Adding…";
+  try {
+    for (let i = 0; i < uris.length; i += 100) await spotify(`/playlists/${current.id}/tracks`, {method: "POST", body: JSON.stringify({uris: uris.slice(i, i + 100)})});
+    uris.forEach(u => inPlaylist.add(u));
+    songs.forEach(s => { s.include = false; });
+    renderSongs();
+    $("#playlist-msg").className = "msg ok";
+    $("#playlist-msg").innerHTML = `Added ${uris.length} song${uris.length === 1 ? "" : "s"} to “${esc(current.name)}”. <a href="${esc(current.external_urls?.spotify || "https://open.spotify.com")}" target="_blank" rel="noopener">Open in Spotify ↗</a>`;
+    $("#step-playlist").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  } catch (e) {
+    $("#playlist-msg").className = "msg";
+    $("#playlist-msg").textContent = e.status === 403 ? "Spotify won't let you add to this playlist. Pick one you own." : "Spotify didn't add the songs. Try again.";
+    update();
+  }
+}
+
+// ---------- Events ----------
+$("#login").addEventListener("click", login);
+$("#logout").addEventListener("click", () => signedOut(""));
+$("#playlist").addEventListener("change", e => choosePlaylist(e.target.value));
+$("#create").addEventListener("click", createPlaylist);
+$("#new-name").addEventListener("keydown", e => { if (e.key === "Enter") createPlaylist(); });
+$("#files").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => addFiles(e.dataTransfer.files));
+document.addEventListener("paste", e => addFiles([...e.clipboardData.items].filter(i => i.kind === "file").map(i => i.getAsFile())));
+$("#songs").addEventListener("change", e => {
+  const d = e.target.dataset;
+  if (d.inc) { songs[d.inc].include = e.target.checked; renderSongs(); }
+  if (d.alt) choose(songs[d.alt], Number(e.target.value));
+});
+$("#songs").addEventListener("click", async e => {
+  const i = e.target.dataset.go; if (i == null) return;
+  const q = document.querySelector(`[data-q="${i}"]`).value.trim(); if (!q) return;
+  e.target.disabled = true;
+  try { const opts = await search(q); if (opts.length) { songs[i].options = opts; choose(songs[i], 0); } else e.target.textContent = "No results"; }
+  catch { e.target.textContent = "Try again"; }
+  finally { e.target.disabled = false; }
+});
+$("#songs").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.q != null) document.querySelector(`[data-go="${e.target.dataset.q}"]`).click(); });
+$("#add").addEventListener("click", addToPlaylist);
+
+// ---------- Start ----------
+(async () => {
+  if (!SPOTIFY_CLIENT_ID || !EXTRACT_URL) { $("#setup").hidden = false; $("#login").disabled = true; update(); return; }
+  try { await finishLogin(); } catch { $("#connect-msg").textContent = "Spotify sign-in didn't finish. Try again."; }
+  if (store.get("earmark-token")) await signedIn(); else update();
+})();
+</script>
