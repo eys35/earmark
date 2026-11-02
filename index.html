@@ -284,8 +284,8 @@ async function choosePlaylist(id) {
   if (current) {
     store.set("earmark-playlist", current.id);
     // Note what's already in the playlist so we don't add duplicates.
-    let next = `/playlists/${current.id}/tracks?fields=items(track(uri)),next&limit=100`;
-    try { while (next && inPlaylist.size < 5000) { const page = await spotify(next); page.items.forEach(i => i.track?.uri && inPlaylist.add(i.track.uri)); next = page.next; } }
+    let next = `/playlists/${current.id}/items?fields=items(item(uri)),next&limit=50`;
+    try { while (next && inPlaylist.size < 5000) { const page = await spotify(next); page.items.forEach(i => { const uri = (i.item || i.track)?.uri; if (uri) inPlaylist.add(uri); }); next = page.next; } }
     catch { /* duplicates just won't be flagged */ }
     for (const s of songs) { const t = s.options[s.pick]; if (t && inPlaylist.has(t.uri)) s.include = false; }
   } else if (id === "__new") $("#new-name").focus();
@@ -297,7 +297,7 @@ async function createPlaylist() {
   if (!name) { $("#playlist-msg").textContent = "Give the new playlist a name."; return; }
   $("#create").disabled = true;
   try {
-    const p = await spotify(`/users/${encodeURIComponent(me.id)}/playlists`, {method: "POST", body: JSON.stringify({name, public: false, description: "Songs saved with Earmark"})});
+    const p = await spotify("/me/playlists", {method: "POST", body: JSON.stringify({name, public: false, description: "Songs saved with Earmark"})});
     $("#new-name").value = "";
     await loadPlaylists(p.id);
   } catch { $("#playlist-msg").textContent = "Spotify didn't create the playlist. Try again."; }
@@ -423,7 +423,7 @@ async function addToPlaylist() {
   const uris = [...new Set(songs.filter(s => s.include && s.options[s.pick]).map(s => s.options[s.pick].uri))];
   $("#add").disabled = true; $("#add").textContent = "Adding…";
   try {
-    for (let i = 0; i < uris.length; i += 100) await spotify(`/playlists/${current.id}/tracks`, {method: "POST", body: JSON.stringify({uris: uris.slice(i, i + 100)})});
+    for (let i = 0; i < uris.length; i += 100) await spotify(`/playlists/${current.id}/items`, {method: "POST", body: JSON.stringify({uris: uris.slice(i, i + 100)})});
     uris.forEach(u => inPlaylist.add(u));
     songs.forEach(s => { s.include = false; });
     renderSongs();

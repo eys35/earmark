@@ -55,7 +55,9 @@ The function's URL is `https://<project-ref>.supabase.co/functions/v1/extract`.
    - `http://127.0.0.1:8020/` (for running it locally; Spotify doesn't accept `localhost`)
 3. Under **Which API/SDKs are you planning to use?**, tick **Web API**. Save.
 4. Copy the **Client ID** (not the client secret; Earmark doesn't use it).
-5. **Settings → User Management**: add each friend's name and the email on their Spotify account. New Spotify apps are in development mode, which only lets listed users sign in (up to 25).
+5. **Settings → User Management**: add each friend's name and the email on their Spotify account. New Spotify apps are in development mode, which only lets listed users sign in: up to 5 per app, and the app owner needs Spotify Premium.
+
+Earmark uses the playlist endpoints from Spotify's February 2026 development-mode changes (`/playlists/{id}/items`, `POST /me/playlists`); the older `/tracks` endpoints are refused for new apps.
 
 ### 4. Fill in the app
 
